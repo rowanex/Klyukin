@@ -486,5 +486,5 @@ class DataSet:
         vacancies_list = DataSet.get_vacancies_list(result_list, title_list)
         return vacancies_list
 
-
-InputConect().start()
+def main():
+    InputConect().start()
