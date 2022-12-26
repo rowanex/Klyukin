@@ -2,6 +2,9 @@ import csv
 import numbers
 import os
 import re
+import cProfile
+import datetime
+
 from prettytable import PrettyTable
 
 dic_naming = {
@@ -33,9 +36,9 @@ dic_naming_filter_helped_reversed = {
     0: 'Название',
     1: 'Описание',
     2: 'Навыки',
-    3:'Опыт работы',
-    4:'Премиум-вакания',
-    5:'Компания',
+    3: 'Опыт работы',
+    4: 'Премиум-вакания',
+    5: 'Компания',
     '6, 7, 8': 'Оклад',
     9: 'Идентификатор валюты оклада',
     10: 'Название региона',
@@ -84,10 +87,12 @@ dic_salary_gross = {
     'Да': 'Без вычета налогов'
 }
 
+
 class Vacancy:
     """ Класс для представления вакансии
 
     """
+
     def __init__(self, name, description, key_skills, experience_id, premium, employer_name, salary, area_name,
                  published_at):
         """ Инициализирует объект Vacancy
@@ -123,6 +128,7 @@ class Salary:
         self.salary_gross(bool): До вычета налогов или нет
         salary_currency (str): Идентификатор валюты оклада
     """
+
     def __init__(self, salary_from, salary_to, salary_gross, salary_currency):
         """
         Инициализирует объект Salary.
@@ -142,6 +148,7 @@ class Table:
     """ Класс для создания таблицы и представления таблицы
 
     """
+
     def create_table(self):
         """ Функция создает таблицу с параметрами по ТЗ и возвращает её же
         Return:
@@ -216,11 +223,11 @@ class Table:
                     return int(numbers[0]), len(resultList)
 
 
-
 class InputConect:
     """ Обрабатывает параметры, вводимые пользователями и печатает таблицу
 
     """
+
     @staticmethod
     def final_check(file_name, filterName, option, optionReverse):
         """ Функция проводит последнюю проверку на входные параметры и в случае ошибки завершает работу программы
@@ -318,6 +325,7 @@ class InputConect:
             return filterName.strip(), filterValue.strip()
         else:
             return filters, ''
+
     @staticmethod
     def get_input_parameters():
         """ Функция получает данные для анализа данных по вакансиям
@@ -351,9 +359,9 @@ class InputConect:
     def fix_published_time(row):
         """ Функция изменяет вид представления времени
         Attributes:
-            row(list): поля вакансии
+            row(str): дата публикации
         Return:
-            list: поле вакансии с измененным представлением времени
+            str: обновленная дата публикации
         """
         if "T" in row and ":" in row:
             row = row.split('T')
@@ -364,6 +372,15 @@ class InputConect:
             return data
         else:
             return row
+
+    #@staticmethod
+    #def fix_published_time_2(date):
+        #result_date = datetime.datetime.strptime(date[:10], '%Y-%m-%d').date()
+        #return '{0.day}.{0.month}.{0.year}'.format(result_date)
+
+    #@staticmethod
+    #def fix_published_time_3(date):
+        #return datetime.datetime.strptime(date, '%Y-%m-%dT%H:%M:%S%z')
 
 
     @staticmethod
@@ -569,7 +586,7 @@ class InputConect:
     def get_sorted_vacancy(vacancies, option, is_reverse_option):
         """ Функция работая с листом вакансии получает отсортированный по параметру сортировки лист с вакансиями
         Attributes:
-            vacancy(object): объект вакансии
+            vacancies(object): объект вакансии
             option(str): Параметр сортировки
             is_reverse_option(str): Параметр порядка сортировки
         Return:
@@ -607,7 +624,6 @@ class InputConect:
         """
         return '{0:,}'.format(int(float(number))).replace(',', ' ')
 
-
     @staticmethod
     def formatter_to_100_Syblos(vacancies):
         """ Функция обрезает текст до 100 символов
@@ -629,7 +645,6 @@ class InputConect:
                     description = (description[:100] + '...')
             vacancy.description = description
         return vacancies
-
 
     @staticmethod
     def formatter(vacancies):
@@ -692,13 +707,10 @@ class InputConect:
                                 vacancy_count, headlines)
 
 
-
 class DataSet:
     """ Класс для создания датасета с полученными вакансиями из csv файла
-
-    Attributes:
-        vacancies (list[list[str]]): Лист объектов вакансий
     """
+
     def __init__(self, file_name):
         """ Инициализирует объект DataSet, для работы получает название csv файла, с которым мы работаем
         Args:
@@ -733,7 +745,9 @@ class DataSet:
                 elif j == 2 and not resultList[i][j]:
                     resultList[i][j] = []
                 else:
-                    resultList[i][j] = re.sub('<.*?>', '', resultList[i][j]).replace("    ", " ").replace("  ", " ").replace("  ", " ").replace(
+                    resultList[i][j] = re.sub('<.*?>', '', resultList[i][j]).replace("    ", " ").replace("  ",
+                                                                                                          " ").replace(
+                        "  ", " ").replace(
                         "  ", " ").rstrip().lstrip().replace("  ", " ").replace(" ", " ")
                 tempList.append(resultList[i][j])
             resultList[i] = tempList
@@ -778,15 +792,16 @@ class DataSet:
                 for i in range(len(row)):
                     dict[title_list[i]] = row[i]
                 vacancies_list.append(
-                    Vacancy(dict['name'], dict['description'], dict['key_skills'], dict['experience_id'], dict['premium'],
+                    Vacancy(dict['name'], dict['description'], dict['key_skills'], dict['experience_id'],
+                            dict['premium'],
                             dict['employer_name'],
-                            Salary(dict['salary_from'], dict['salary_to'], dict['salary_gross'], dict['salary_currency']),
+                            Salary(dict['salary_from'], dict['salary_to'], dict['salary_gross'],
+                                   dict['salary_currency']),
                             dict['area_name'], dict['published_at']))
             return vacancies_list
 
         else:
             return vacancies_list
-
 
     @staticmethod
     def parser_csv(file_name):
@@ -802,9 +817,11 @@ class DataSet:
         vacancies_list = DataSet.get_vacancies_list(result_list, title_list)
         return vacancies_list
 
+
 def main():
     """ Функция запускает обработку данных и получает обработанные данные в виде таблицы
     """
     InputConect().start()
 
 
+cProfile.run('main()')
