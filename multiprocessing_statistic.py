@@ -1,3 +1,7 @@
+import glob
+import multiprocessing
+import time
+
 import openpyxl
 from openpyxl.styles import Border, Side, Font
 from openpyxl.utils import get_column_letter
@@ -13,6 +17,9 @@ import re
 from matplotlib.axes import Axes
 from jinja2 import Template
 import pdfkit
+
+start = time.time()
+profession_name = 'Аналитик'
 
 matplotlib.use('TkAgg')
 plt.rcParams.update({'font.size': 8})
@@ -146,36 +153,24 @@ class Report:
         number_of_vacancies_by_year_dict(dict{int: int}): Количество вакансий по годам
         salary_for_vacancy_by_years_dict(dict{int: int}): Зарпалата по годам для выбранной профессии
         number_of_vacancies_by_year_for_vac_dict(dict{int: int}): Колличество вакансий по годам выбранной пофесиий
-        salary_by_city_dict(dict{str: int}): Средняя зарплата по городам
-        number_of_vacancies_by_city_dict(dict{str: int or str}): Количество вакансий по городам
-        number_of_vacancies_by_city_dict_percent(dict{str: str}): Количество вакансий по городам по процентам
         profession_name(str): Название выбранной профессии
         sheet_1_headers (list(str)): Названия колонок для формирования первой таблицы (статистика по годам)
-        sheet_2_headers (list(str)): Названия колонок для формирования второй таблицы (статистика по городам)
         sheet_years_rows (list[list[str]]): Значения для первой таблицы (статистика по годам)
-        sheet_cities_rows (list[list[str]]): Значения для второй таблицы (статистика по городам)
     """
     def __init__(self, salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict,
-                 number_of_vacancies_by_year_for_vac_dict, salary_by_city_dict,
-                 number_of_vacancies_by_city_dict, number_of_vacancies_by_city_dict_percent, profession_name):
+                 number_of_vacancies_by_year_for_vac_dict, profession_name):
         """ Инициализация данных для статистики вакансий и выбранной профессии
         Args:
             salary_by_years_dict(dict{int: int}): Средняя заплата вакансий по годам
             number_of_vacancies_by_year_dict(dict{int: int}): Количество вакансий по годам
             salary_for_vacancy_by_years_dict(dict{int: int}): Зарпалата по годам для выбранной профессии
             number_of_vacancies_by_year_for_vac_dict(dict{int: int}): Колличество вакансий по годам выбранной пофесиий
-            salary_by_city_dict(dict{str: int}): Средняя зарплата по городам
-            number_of_vacancies_by_city_dict(dict{str: int or str}): Количество вакансий по городам
-            number_of_vacancies_by_city_dict_percent(dict{str: str}): Количество вакансий по городам по процентам
             profession_name(str): Название выбранной профессии
         """
         self.salary_by_years_dict = salary_by_years_dict
         self.number_of_vacancies_by_year_dict = number_of_vacancies_by_year_dict
         self.salary_for_vacancy_by_years_dict = salary_for_vacancy_by_years_dict
         self.number_of_vacancies_by_year_for_vac_dict = number_of_vacancies_by_year_for_vac_dict
-        self.salary_by_city_dict = salary_by_city_dict
-        self.number_of_vacancies_by_city_dict = number_of_vacancies_by_city_dict
-        self.number_of_vacancies_by_city_dict_percent = number_of_vacancies_by_city_dict_percent
         self.profession_name = profession_name
         self.sheet_1_headers = ["Год", "Средняя зарплата", f"Средняя зарплата -{self.profession_name}",
                                 "Количество вакансий", f"Количество вакансий -{self.profession_name}"]
@@ -183,9 +178,6 @@ class Report:
         self.sheet_years_rows = self.get_table_rows([list(self.salary_by_years_dict.keys()), list(self.salary_by_years_dict.values()),
                                list(self.salary_for_vacancy_by_years_dict.values()), list(self.number_of_vacancies_by_year_dict.values()),
                                list(self.number_of_vacancies_by_year_for_vac_dict.values())])
-        self.sheet_cities_rows = self.get_table_rows([list(self.salary_by_city_dict.keys()), list(self.salary_by_city_dict.values()),
-                           ["" for _ in self.salary_by_city_dict.keys()], list(self.number_of_vacancies_by_city_dict.keys()),
-                           list(self.number_of_vacancies_by_city_dict_percent.values())])
 
     @staticmethod
     def fill_column(sheet, data, letters):
@@ -221,27 +213,6 @@ class Report:
         Report.fill_column(sheet_statistic_by_year, year, column_letter_year[1:])
         return sheet_statistic_by_year
 
-    def fill_city_sheet(self, sheet_statistic_by_city):
-        """Функция заполнения листа статистикой по годам
-        Attributes:
-            sheet_statistic_by_city(Workbook): лист книги xlsx для статистики по городам
-        Returns:
-            Workbook: лист книги xlsx для статистики по городам
-        """
-        sheet_statistic_by_city['A1'] = 'Город'
-        sheet_statistic_by_city['B1'] = 'Уровень зарплат'
-        sheet_statistic_by_city['D1'] = 'Город'
-        sheet_statistic_by_city['E1'] = 'Доля вакансий'
-        column_letter_city = 'ABDE'
-        for letter in column_letter_city:
-            sheet_statistic_by_city[f'{letter}1'].font = Font(bold=True)
-        for row, (key, value) in enumerate(self.salary_by_city_dict.items(), start=2):
-            sheet_statistic_by_city[f'A{row}'] = key
-            sheet_statistic_by_city[f'D{row}'] = key
-            sheet_statistic_by_city[f'B{row}'] = value
-        for row, (key, value) in enumerate(self.number_of_vacancies_by_city_dict_percent.items(), start=2):
-            sheet_statistic_by_city[f'E{row}'] = value
-        return sheet_statistic_by_city
 
     @staticmethod
     def get_border(sheet, border):
@@ -284,13 +255,9 @@ class Report:
         """
         book = openpyxl.Workbook()
         sheet_statistic_by_year = book.active
-        sheet_statistic_by_city = book.create_sheet('Статистика по городам')
         sheet_statistic_by_year = Report.fill_year_sheet(self, sheet_statistic_by_year)
-        sheet_statistic_by_city = Report.fill_city_sheet(self, sheet_statistic_by_city)
         Report.get_border(sheet_statistic_by_year, Side(border_style='thin', color='000000'))
-        Report.get_border(sheet_statistic_by_city, Side(border_style='thin', color='000000'))
         Report.set_width_cells(sheet_statistic_by_year)
-        Report.set_width_cells(sheet_statistic_by_city)
         return book
 
     def draw_horizontal_diagram(self, ax: Axes, keys_general, values_general, values_vacancy, label_general, label_vacancy, title):
@@ -312,31 +279,6 @@ class Report:
         ax.set_title(title)
         ax.grid(visible=True, axis="y")
 
-    def draw_vertical_diagram(self, ax: Axes, title):
-        """ Функция отрисовывает вертикальные диаграммы
-        Attributes:
-            ax: Axes(Matplotlib.axes): Экземпляр класса осей
-            title(str): заголовок для диаграммы
-        """
-        keys = [key.replace(" ", "\n").replace("-", "-\n") for key in reversed(list(self.salary_by_city_dict.keys()))]
-        values = [x for x in reversed(list(self.salary_by_city_dict.values()))]
-        ax.barh(keys, values)
-        ax.grid(visible=True, axis='x')
-        ax.set_title(title)
-
-    def draw_pie_diogramm(self, ax: Axes, title):
-        """ Функция отрисовывает круговые диаграммы
-        Attributes:
-            ax: Axes(Matplotlib.axes): Экземпляр класса осей
-            title(str): заголовок для диаграммы
-        """
-        plt.rc('xtick', labelsize=6)
-        dict = self.number_of_vacancies_by_city_dict
-        dict["Другие"] = 1 - sum([val for val in dict.values()])
-        keys = list(dict.keys())
-        ax.pie(list(dict.values()), labels=keys)
-        ax.axis('equal')
-        ax.set_title(title)
 
     def generate_image(self, file_name):
         """ Функция создет и сохраняет графики по ТЗ
@@ -346,8 +288,6 @@ class Report:
         fig, ax = plt.subplots(nrows=2, ncols=2)
         self.draw_horizontal_diagram(ax[0, 0], self.salary_by_years_dict.keys(), self.salary_by_years_dict.values(), self.salary_for_vacancy_by_years_dict.values(), "Средняя з/п", f"з/п {self.profession_name}", "Уровень зарплат по годам")
         self.draw_horizontal_diagram(ax[0, 1], self.number_of_vacancies_by_year_dict.keys(), self.number_of_vacancies_by_year_dict.values(), self.number_of_vacancies_by_year_for_vac_dict.values(), "Количество вакансий", f"Количество вакансий {self.profession_name} ", "Количество вакансий по годам")
-        self.draw_vertical_diagram(ax[1, 0], "Уровень зарплат по городам")
-        self.draw_pie_diogramm(ax[1, 1], "Доля вакансий по городам")
         fig.tight_layout()
         fig.savefig(file_name)
 
@@ -369,7 +309,7 @@ class Report:
         Attributes:
             png_name(str): Имя файла картинки графиков
         """
-        html = open("html_template.html").read()
+        html = open("html_template_multi.html").read()
         template = Template(html)
         keys_to_values = {
             "title": "Аналитика по зарплатам и городам для профессии " + self.profession_name,
@@ -377,10 +317,7 @@ class Report:
             "years_title": "Статистика по годам",
             "years_headers": self.sheet_1_headers,
             "years_rows": self.sheet_years_rows,
-            "cities_title": "Статистика по городам",
-            "cities_headers": self.sheet_2_headers,
             "count_columns": len(self.sheet_2_headers),
-            "cities_rows": self.sheet_cities_rows
         }
         pdf_template = template.render(keys_to_values)
         config = pdfkit.configuration(wkhtmltopdf=r"C:/Program Files/wkhtmltopdf/bin/wkhtmltopdf.exe")
@@ -445,24 +382,20 @@ class InputConect:
         return InputConect.currency_transfer(averageSalary, currency)
 
     @staticmethod
-    def get_years_dict_and_city_dict(vacancies_objects):
+    def get_years_dict(vacancies_objects):
         """Функция генерирует pdf по шаблону html_template
         Attributes:
             vacancies_objects(list[object]): Лист объектов вакансий
         Returns:
             years_dict(dict{}): словарь, где ключи - года
-            city_dict(dict{}): словарь, где ключи - города
         """
         years_dict = {}
-        city_dict = {}
         for vacancy in vacancies_objects:
             if vacancy.published_at[0:4] not in years_dict.keys():
                 years_dict[int(vacancy.published_at[0:4])] = 0
-            if vacancy.area_name not in city_dict.keys():
-                city_dict[vacancy.area_name] = 0
             else:
                 continue
-        return years_dict, city_dict
+        return years_dict
 
     @staticmethod
     def get_all_statistic_by_years(year, vacancies_objects, profession_name):
@@ -493,45 +426,22 @@ class InputConect:
             sum_salary_for_one_vacancy = 0
         return sum_salary_of_vacancies_by_year, count_of_vacancies, sum_salary_for_one_vacancy, count_of_vacancies_for_one_vac
 
-    @staticmethod
-    def get_all_statistic_by_city(city, vacancies_objects):
-        """Функция получает статистику по городам
-        Attributes:
-            city(str): город
-            vacancies_objects(list[object]): Лист объектов вакансий
-        Returns:
-            (int): зп по городам
-            (int): доля вакансий по городам
-        """
-        salary = []
-        for vacancy in vacancies_objects:
-            if vacancy.area_name == city:
-                salary.append(InputConect.get_average_salary(vacancy))
-        if len(vacancies_objects) / 100 <= len(salary):
-            return int((sum(salary)) / len(salary)), len(salary) / len(vacancies_objects)
-        else:
-            return 0, 0
 
     @staticmethod
     def print_data_for_graph(salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict,
-                             number_of_vacancies_by_year_for_vac_dict, sorted_salary_by_city_dict_without_zero,
-                             sorted_number_of_vacancies_by_city_dict_without_zero):
+                             number_of_vacancies_by_year_for_vac_dict):
         """Функция печатает статистику в соответствии с ТЗ
         Attributes:
             salary_by_years_dict(dict{}): Словарь зп по годам для всех вакансий
             number_of_vacancies_by_year_dict(dict{}): Словарь кол-ва вакансий для всех вакансий
             salary_for_vacancy_by_years_dict(dict{}): Словарь зп для выбранной профессии
             number_of_vacancies_by_year_for_vac_dict(dict{}): Словарь кол-ва вакансий для выбранной профессии
-            sorted_salary_by_city_dict_without_zero(dict{}): Отсортированный словарь зп по городам без 0 значений
-            sorted_number_of_vacancies_by_city_dict_without_zero(dict{}): Отсортированный словарь кол-ва вакансий по городам без 0 значений
         """
         print('Динамика уровня зарплат по годам:', salary_by_years_dict)
         print('Динамика количества вакансий по годам:', number_of_vacancies_by_year_dict)
         print('Динамика уровня зарплат по годам для выбранной профессии:', salary_for_vacancy_by_years_dict)
         print('Динамика количества вакансий по годам для выбранной профессии:',
               number_of_vacancies_by_year_for_vac_dict)
-        print('Уровень зарплат по городам (в порядке убывания):', sorted_salary_by_city_dict_without_zero)
-        print('Доля вакансий по городам (в порядке убывания):', sorted_number_of_vacancies_by_city_dict_without_zero)
 
     @staticmethod
     def get_data_for_graph(vacancies_objects, profession_name):
@@ -544,17 +454,12 @@ class InputConect:
             number_of_vacancies_by_year_dict(dict{}): Словарь кол-ва вакансий для всех вакансий
             salary_for_vacancy_by_years_dict(dict{}): Словарь зп для выбранной профессии
             number_of_vacancies_by_year_for_vac_dict(dict{}): Словарь кол-ва вакансий для выбранной профессии
-            sorted_salary_by_city_dict_without_zero(dict{}): Сортированный словарь зп по городам без 0 значений
-            sorted_number_of_vacancies_by_city_dict_without_zero(dict{}): Сортированный словарь кол-ва вакансий по городам без 0 значений
-            number_of_vacancies_by_city_dict_percent(dict{}): Словарь количество вакансий по городам в процентах
         """
-        years_dict, city_dict = InputConect.get_years_dict_and_city_dict(vacancies_objects)
+        years_dict = InputConect.get_years_dict(vacancies_objects)
         salary_by_years_dict = {}
         number_of_vacancies_by_year_dict = {}
         salary_for_vacancy_by_years_dict = {}
         number_of_vacancies_by_year_for_vac_dict = {}
-        salary_by_city_dict = {}
-        number_of_vacancies_by_city_dict = {}
         for year in years_dict.keys():
             sum_salary_of_vacancies_by_year, count_of_vacancies, \
             sum_salary_for_one_vacancy, count_of_vacancies_for_one_vac = InputConect.get_all_statistic_by_years(year,
@@ -564,51 +469,85 @@ class InputConect:
             number_of_vacancies_by_year_dict[year] = count_of_vacancies
             salary_for_vacancy_by_years_dict[year] = sum_salary_for_one_vacancy
             number_of_vacancies_by_year_for_vac_dict[year] = count_of_vacancies_for_one_vac
-        for city in city_dict.keys():
-            salary_levels_by_city, share_of_vacancies_by_city = InputConect.get_all_statistic_by_city(city,
-                                                                                                      vacancies_objects)
-            salary_by_city_dict[city] = salary_levels_by_city
-            number_of_vacancies_by_city_dict[city] = share_of_vacancies_by_city
-        sorted_salary_by_city_dict = dict(
-            sorted(salary_by_city_dict.items(), key=lambda item: item[1], reverse=True)[:10])
-        sorted_number_of_vacancies_by_city_dict = dict(
-            sorted(number_of_vacancies_by_city_dict.items(), key=lambda item: item[1], reverse=True)[:10])
-        for key in sorted_number_of_vacancies_by_city_dict.keys():
-            sorted_number_of_vacancies_by_city_dict[key] = round(sorted_number_of_vacancies_by_city_dict[key], 4)
-        sorted_salary_by_city_dict_without_zero = {k: v for k, v in sorted_salary_by_city_dict.items() if v != 0}
-        sorted_number_of_vacancies_by_city_dict_without_zero = {k: v for k, v in
-                                                                sorted_number_of_vacancies_by_city_dict.items() if
-                                                                v != 0}
         InputConect.print_data_for_graph(salary_by_years_dict, number_of_vacancies_by_year_dict,
                                          salary_for_vacancy_by_years_dict,
-                                         number_of_vacancies_by_year_for_vac_dict,
-                                         sorted_salary_by_city_dict_without_zero,
-                                         sorted_number_of_vacancies_by_city_dict_without_zero)
-        number_of_vacancies_by_city_dict_percent = {}
-        for key in sorted_number_of_vacancies_by_city_dict.keys():
-            number_of_vacancies_by_city_dict_percent[
-                key] = f'{round(sorted_number_of_vacancies_by_city_dict[key] * 100, 2)}%'
+                                         number_of_vacancies_by_year_for_vac_dict)
         return (salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict,
-                number_of_vacancies_by_year_for_vac_dict, sorted_salary_by_city_dict_without_zero,
-                sorted_number_of_vacancies_by_city_dict_without_zero, number_of_vacancies_by_city_dict_percent)
+                number_of_vacancies_by_year_for_vac_dict)
+
 
     @staticmethod
     def start():
         """Функция запускающая получение статистики и сохранения его в файлы по ТЗ
         """
-        file_name, profession_name = InputConect().get_input_parameters()
-        data_set = DataSet(file_name)
-        salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict,\
-        number_of_vacancies_by_year_for_vac_dict, salary_by_city_dict, number_of_vacancies_by_city_dict,\
-        number_of_vacancies_by_city_dict_percent = InputConect.get_data_for_graph(
-            data_set.vacancies_objects, profession_name)
+        csv_files = InputConect().get_list_csv_files()
+        with multiprocessing.Pool(processes=16) as p:
+            dicts = p.map(InputConect().get_data_by_dicts, csv_files)
+            salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict, \
+            number_of_vacancies_by_year_for_vac_dict  = InputConect().print_prepare_data(dicts)
         statistic = Report(salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict,
-                       number_of_vacancies_by_year_for_vac_dict, salary_by_city_dict, number_of_vacancies_by_city_dict, number_of_vacancies_by_city_dict_percent,
-                       profession_name)
+                           number_of_vacancies_by_year_for_vac_dict, profession_name)
+        os.chdir(r'C:\Users\Admin\PycharmProjects\Klyukin')
         statistic.generate_excel().save('report.xlsx')
         statistic.generate_image('graph.png')
         statistic.generate_pdf('graph.png')
 
+    @staticmethod
+    def get_list_csv_files():
+        """ Метод получает лист файлов csv с которыми нужно работать анализируя данные
+        Return:
+            list[str]: лист названий csv файлов
+        """
+        path = r'C:\Users\Admin\PycharmProjects\Klyukin\csv'
+        os.chdir(path)
+        files = glob.glob('*.{}'.format('csv'))
+        return files
+
+    @staticmethod
+    def get_data_by_dicts(file_name):
+        """ Метод получает данные из csv файлов, создавая датасеты для файла
+        Attributes:
+            file_name(str): Название файла
+        Return:
+            dict: Динамика уровня зарплат по годам
+            dict: Динамика количества вакансий по годам
+            dict: Динамика уровня зарплат по годам для выбранной профессии
+            dict: Динамика количества вакансий по годам для выбранной профессии:
+        """
+        data_set = DataSet(f'{file_name}')
+        salary_by_years_dict, number_of_vacancies_by_year_dict,\
+        salary_for_vacancy_by_years_dict, number_of_vacancies_by_year_for_vac_dict = InputConect.get_data_for_graph(
+            data_set.vacancies_objects, profession_name)
+        return salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict, number_of_vacancies_by_year_for_vac_dict
+
+    @staticmethod
+    def print_prepare_data(data_list):
+        """ Метод выводит в коносоль данные, которые были получены из csv файлов
+        Attributes:
+            data_list(list[tuple{dict}]): Данные из csv файла
+        Return:
+            dict: Динамика уровня зарплат по годам
+            dict: Динамика количества вакансий по годам
+            dict: Динамика уровня зарплат по годам для выбранной профессии
+            dict: Динамика количества вакансий по годам для выбранной профессии:
+        """
+        print(data_list)
+        salary_by_years_dict = {}
+        number_of_vacancies_by_year_dict = {}
+        salary_for_vacancy_by_years_dict = {}
+        number_of_vacancies_by_year_for_vac_dict = {}
+        statistic_data_by_dicts = [salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict,
+                    number_of_vacancies_by_year_for_vac_dict]
+        for year in data_list:
+            for i in range(len(year)):
+                year_items = year[i].items()
+                for dic in year_items:
+                    statistic_data_by_dicts[i][dic[0]] = dic[1]
+        print(f'Динамика уровня зарплат по годам: {salary_by_years_dict}')
+        print(f'Динамика количества вакансий по годам: {number_of_vacancies_by_year_dict}')
+        print(f'Динамика уровня зарплат по годам для выбранной профессии: {salary_for_vacancy_by_years_dict}')
+        print(f'Динамика количества вакансий по годам для выбранной профессии: {number_of_vacancies_by_year_for_vac_dict}')
+        return salary_by_years_dict, number_of_vacancies_by_year_dict, salary_for_vacancy_by_years_dict, number_of_vacancies_by_year_for_vac_dict
 
 class DataSet:
     """ Класс для создания датасета с полученными вакансиями из csv файла
@@ -715,3 +654,8 @@ def main():
     """ Функция запускает обработку данных и получает данные в нужном виде(pdf-файл)
     """
     InputConect().start()
+
+
+if __name__ == '__main__':
+    main()
+    print(f'{time.time() - start} seconds')

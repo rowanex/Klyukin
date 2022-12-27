@@ -823,5 +823,3 @@ def main():
     """
     InputConect().start()
 
-
-cProfile.run('main()')
