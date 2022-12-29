@@ -34,7 +34,7 @@ class DataSet:
         Return:
             list: Лист с данными вакансий
         """
-        filtered_data = [vacancy for vacancy in data_list if not ('' in vacancy) and len(vacancy) == len(header_list)]
+        filtered_data = [vacancy for vacancy in data_list]
         return filtered_data
 
 
@@ -52,12 +52,12 @@ class SplitCsvFile:
         result_data = DataSet().filter_csv(data_list, header_list)
         for vacancy in result_data:
             year = vacancy[header_list.index('published_at')][:4]
-            if os.path.exists(f"csv/{year}.csv"):
-                with open(f"csv/{year}.csv", mode="a", encoding='utf-8-sig') as file:
+            if os.path.exists(f"data/{year}.csv"):
+                with open(f"data/{year}.csv", mode="a", encoding='utf-8-sig') as file:
                     file_writer = csv.writer(file, delimiter=',', lineterminator="\r")
                     file_writer.writerow(vacancy)
             else:
-                with open(f"csv/{year}.csv", mode="w", encoding='utf-8-sig') as file:
+                with open(f"data/{year}.csv", mode="w", encoding='utf-8-sig') as file:
                     file_writer = csv.writer(file, delimiter=',', lineterminator="\r")
                     file_writer.writerow(header_list)
                     file_writer.writerow(vacancy)
